@@ -184,12 +184,13 @@ impl crate::Tensor {
     pub fn read_npz<T: AsRef<Path>>(path: T) -> Result<Vec<(String, Tensor)>, TchError> {
         let zip_reader = BufReader::new(File::open(path.as_ref())?);
         let mut zip = zip::ZipArchive::new(zip_reader)?;
+        zip.validate_header_consistency()?;
         let mut result = vec![];
         for i in 0..zip.len() {
-            let mut reader = zip.by_index(i).unwrap();
+            let mut reader = zip.by_index(i)?;
             let name = {
-                let name = reader.name();
-                name.strip_suffix(NPY_SUFFIX).unwrap_or(name).to_owned()
+                let name = reader.name()?;
+                name.strip_suffix(NPY_SUFFIX).unwrap_or(&name).to_owned()
             };
             let header = read_header(&mut reader)?;
             let header = Header::parse(&header)?;
@@ -235,8 +236,8 @@ impl crate::Tensor {
         path: P,
     ) -> Result<(), TchError> {
         let mut zip = zip::ZipWriter::new(File::create(path.as_ref())?);
-        let options =
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
 
         for (name, tensor) in ts.iter() {
             zip.start_file(format!("{}.npy", name.as_ref()), options)?;

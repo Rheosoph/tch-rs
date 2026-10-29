@@ -118,6 +118,32 @@ fn save_and_load_npz() {
 }
 
 #[test]
+fn npz_rejects_conflicting_local_filenames_before_reading_tensors() {
+    use std::io::{Cursor, Write};
+
+    let tmp_file = TmpFile::create("npz-conflicting-filenames");
+    let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    let options =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    for name in ["first.npy", "second.npy"] {
+        writer.start_file(name, options).unwrap();
+        writer.write_all(b"invalid tensor payload").unwrap();
+    }
+    let mut bytes = writer.finish().unwrap().into_inner();
+    let local_header = zip::ZipArchive::new(Cursor::new(&bytes))
+        .unwrap()
+        .by_name("second.npy")
+        .unwrap()
+        .header_start() as usize;
+    // Keep the central directory intact and change only the second local filename.
+    bytes[local_header + 30] = b'x';
+    std::fs::write(&tmp_file, bytes).unwrap();
+
+    let error = Tensor::read_npz(&tmp_file).unwrap_err();
+    assert!(error.to_string().contains("filename mismatch"), "{error}");
+}
+
+#[test]
 fn save_and_load_npz_half() {
     let tmp_file = TmpFile::create("save-and-load-npz-half");
     let pi = Tensor::from_slice(&[3.0, 1.0, 4.0, 1.0, 5.0]).to_dtype(Kind::Half, true, false);

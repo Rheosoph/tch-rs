@@ -23,7 +23,7 @@ ndarray = "0.16.1"
 rand = "0.8"
 thiserror = "1"
 torch-sys = { version = "0.22.0", path = "torch-sys" }
-zip = "0.6"
+zip = { version = "9.0.5", default-features = false, features = ["aes-crypto", "bzip2", "deflate-flate2-zlib-rs", "time", "zstd"] }
 half = "2"
 safetensors = "0.3.0"
 
